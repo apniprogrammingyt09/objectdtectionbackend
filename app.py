@@ -7,9 +7,8 @@ import base64
 # Initialize FastAPI app
 app = FastAPI()
 
-# Load YOLOv12x model
-model_path = "12x.pt"
-model = YOLO(model_path)
+# Load YOLOv12x model (auto-download if not present)
+model = YOLO("yolov12m.pt")  # Replace with the correct YOLOv12 model if available
 
 
 def process_frame(frame):
@@ -70,4 +69,4 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/")
 def home():
-    return {"message": "YOLOv12x Real-Time Object Detection & Counting API"}
+    return {"message": "YOLOv8x Real-Time Object Detection & Counting API"}
