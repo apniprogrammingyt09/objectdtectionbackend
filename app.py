@@ -8,36 +8,45 @@ import os
 # Initialize FastAPI app
 app = FastAPI()
 
-# Load YOLO model (Ensure 12x.pt exists)
-model_path = "12x.pt"
+# Ensure model exists
+model_path = os.path.join(os.getcwd(), "12x.pt")
 if not os.path.exists(model_path):
     raise FileNotFoundError(f"Model file '{model_path}' not found. Please place it in the project directory.")
 
-model = YOLO(model_path)
+# Try loading the YOLO model
+try:
+    model = YOLO(model_path)
+except Exception as e:
+    raise RuntimeError(f"Error loading YOLO model: {str(e)}")
 
 
 def process_frame(frame):
-    results = model(frame)
+    """Processes a frame through YOLO and returns predictions."""
+    results = model(frame)  # Run YOLO detection
     predictions = []
     object_count = {}
 
     for result in results:
-        for box in result.boxes:
-            class_name = result.names[int(box.cls)]
-            predictions.append({
-                "class": class_name,
-                "confidence": float(box.conf),
-                "bbox": [float(x) for x in box.xyxy[0]]
-            })
+        if hasattr(result, "boxes"):  # Check if boxes exist in result
+            for box in result.boxes:
+                class_id = int(box.cls[0])  # Ensure correct data type
+                class_name = result.names[class_id] if class_id in result.names else f"Unknown_{class_id}"
+                
+                predictions.append({
+                    "class": class_name,
+                    "confidence": float(box.conf[0]),
+                    "bbox": [float(x) for x in box.xyxy[0]]
+                })
 
-            # Count objects
-            object_count[class_name] = object_count.get(class_name, 0) + 1
+                # Count objects
+                object_count[class_name] = object_count.get(class_name, 0) + 1
 
     return predictions, object_count
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    """Handles WebSocket connections for real-time video streaming."""
     await websocket.accept()
 
     cap = cv2.VideoCapture(0)  # Open webcam
@@ -50,6 +59,7 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             ret, frame = cap.read()
             if not ret:
+                await websocket.send_json({"error": "Failed to read frame"})
                 break
 
             predictions, object_count = process_frame(frame)
@@ -71,6 +81,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"WebSocket Error: {e}")
         await websocket.send_json({"error": str(e)})
+
     finally:
         cap.release()
         await websocket.close()
@@ -78,4 +89,5 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/")
 def home():
+    """Root endpoint for API status."""
     return {"message": "Real-Time Object Detection API using 12x.pt"}
