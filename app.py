@@ -8,7 +8,7 @@ import base64
 app = FastAPI()
 
 # Load YOLOv12x model (auto-download if not present)
-model = YOLO("yolov12m.pt")  # Replace with the correct YOLOv12 model if available
+model = YOLO("12x.pt")  # Replace with the correct YOLOv12 model if available
 
 
 def process_frame(frame):
