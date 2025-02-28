@@ -3,12 +3,17 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 import base64
+import os
 
 # Initialize FastAPI app
 app = FastAPI()
 
-# Load YOLOv12x model (auto-download if not present)
-model = YOLO("yolo12x.pt")  # Replace with the correct YOLOv12 model if available
+# Load YOLO model (Ensure 12x.pt exists)
+model_path = "12x.pt"
+if not os.path.exists(model_path):
+    raise FileNotFoundError(f"Model file '{model_path}' not found. Please place it in the project directory.")
+
+model = YOLO(model_path)
 
 
 def process_frame(frame):
@@ -26,10 +31,7 @@ def process_frame(frame):
             })
 
             # Count objects
-            if class_name in object_count:
-                object_count[class_name] += 1
-            else:
-                object_count[class_name] = 1
+            object_count[class_name] = object_count.get(class_name, 0) + 1
 
     return predictions, object_count
 
@@ -37,9 +39,15 @@ def process_frame(frame):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+
     cap = cv2.VideoCapture(0)  # Open webcam
+    if not cap.isOpened():
+        await websocket.send_json({"error": "Could not open webcam"})
+        await websocket.close()
+        return
+
     try:
-        while cap.isOpened():
+        while True:
             ret, frame = cap.read()
             if not ret:
                 break
@@ -62,6 +70,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except Exception as e:
         print(f"WebSocket Error: {e}")
+        await websocket.send_json({"error": str(e)})
     finally:
         cap.release()
         await websocket.close()
@@ -69,4 +78,4 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/")
 def home():
-    return {"message": "YOLO12x Real-Time Object Detection & Counting API"}
+    return {"message": "Real-Time Object Detection API using 12x.pt"}
